@@ -74,6 +74,15 @@ body {
     -webkit-tap-highlight-color: transparent;
 }
 
+.swalNextMissionButton {
+    width: 144px !important;
+    background-color: darkcyan;
+    cursor: pointer;
+    outline: none;
+    border: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
 .slide-right-to-left-enter-active,
 .slide-left-to-right-leave-active,
 .slide-left-to-right-enter-active,

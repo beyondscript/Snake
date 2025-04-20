@@ -44,7 +44,7 @@
 	export default {
 		setup() {
 			const scores = ref([])
-			const excludedKeys = ['enableButtons', 'enableSounds']
+			const excludedKeys = ['enableButtons', 'enableSounds', 'currentStage', 'stageScore']
 			const mounted = ref(false)
 			const loading = ref(true)
 

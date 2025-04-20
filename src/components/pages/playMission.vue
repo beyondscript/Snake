@@ -1,10 +1,15 @@
 <template>
     <main class="mainContainer">
-    	<div class="scoreContainer">
-	        <p class="score">
-	            Score: <span id="scoreCounter">{{ scoreCounter }}</span>
-	        </p>
-	    </div>
+    	<div class="fullWidthScoreContainer">
+    		<div class="scoreContainer">
+	    		<p class="score">
+	    			Mission: <span id="currentStage">{{ currentStage }}</span>
+	    		</p>
+		        <p class="score">
+		            Score: <span id="scoreCounter">{{ scoreCounter }}</span>
+		        </p>
+		    </div>
+    	</div>
 
 	    <div class="canvasContainer">
 	        <canvas ref="canvas" id="gameCanvas" width="288" height="288"></canvas>
@@ -64,7 +69,7 @@
 	        const snake = ref([{ x: 180, y: 180 }, { x: 168, y: 180 }, { x: 156, y: 180 }])
 	        const router = useRouter()
 	        const audioContext = new (window.AudioContext || window.webkitAudioContext)()
-	        const excludedKeys = ['enableButtons', 'enableSounds']
+	        const excludedKeys = ['enableButtons', 'enableSounds', 'currentStage', 'stageScore']
 	        const enableButtons = ref(true)
         	const enableSounds = ref(true)
         	const opposite = {
@@ -73,6 +78,45 @@
 		      	UP: "DOWN",
 		      	DOWN: "UP"
 		    }
+		    const stageConfigs = {
+		      	1: {
+		        	wall: [
+		        		{ x: 60, y: 60 },
+		        		{ x: 72, y: 60 },
+		        		{ x: 84, y: 60 }
+		        	],
+		        	fruitsToNext: 10
+		      	},
+		      	2: {
+			    	wall: [
+			      		{ x: 96, y: 96 },
+					    { x: 96, y: 108 },
+					    { x: 96, y: 120 }
+			    	],
+			    	fruitsToNext: 15
+			  	},
+		      	3: {
+		        	wall: [
+		          		{ x: 120, y: 120 },
+		          		{ x: 132, y: 120 },
+		          		{ x: 144, y: 120 },
+		          		{ x: 144, y: 132 },
+		          		{ x: 144, y: 144 }
+		        	],
+		        	fruitsToNext: 10
+		      	},
+		      	4: {
+		        	wall: [
+		          		{ x: 240, y: 180 },
+		          		{ x: 252, y: 180 },
+		          		{ x: 264, y: 180 },
+		          		{ x: 276, y: 180 },
+		          		{ x: 276, y: 192 }
+		        	],
+		        	fruitsToNext: 15
+		      	}
+		    }
+		    const swipeThreshold = 25
 
 	        let direction = "RIGHT"
 	        let directionQueue = []
@@ -82,6 +126,7 @@
 	        let speed = 200
 	        let speedIncreaser = 1
 	        let redFoodEaten = 0
+	        let nextStageFoodEaten = 0
 	        let blueFoodTimer = null
 	        let nextBlueFoodAt = Math.floor(Math.random() * 5) + 5
 	        let redFood = ref(null)
@@ -96,34 +141,81 @@
 	        let fruitEatBuffer = null
 			let superFruitEatBuffer = null
 			let gameOverBuffer = null
+			let missionCompletedBuffer = null
+			let gameCompletedBuffer = null
+			let currentStage = ref(1)
+    		let wallBlocks = ref([])
+
+    		const applyStage = async(stage) => {
+		      	wallBlocks.value = stageConfigs[stage].wall
+
+		      	speed = 200
+
+			  	speedIncreaser = 1
+
+			  	direction = "RIGHT"
+
+			  	directionQueue = []
+
+			  	snake.value = [{ x: 180, y: 180 }, { x: 168, y: 180 }, { x: 156, y: 180 }]
+
+			  	redFood.value = spawnFood()
+
+			  	blueFood.value = null
+
+			  	redFoodEaten = 0
+
+			  	if (stage > 1) {
+			  		await Preferences.set({ key: 'currentStage', value: encrypt(stage) })
+
+			  		await Preferences.set({ key: 'stageScore', value: encrypt(score) })
+			  	}
+		    }
 
 	        function spawnFood() {
-	        	let food = null
+			    const validPositions = []
+			    const snakePositions = new Set(snake.value.map(seg => `${seg.x},${seg.y}`))
+			    const wallPositions = new Set(wallBlocks.value.map(wall => `${wall.x},${wall.y}`))
 
-			    do {
-			        food = {
-			            x: Math.floor(Math.random() * (canvas.value.width / gridSize)) * gridSize,
-			            y: Math.floor(Math.random() * (canvas.value.height / gridSize)) * gridSize
+			    for (let x = 0; x < canvas.value.width; x += gridSize) {
+			        for (let y = 0; y < canvas.value.height; y += gridSize) {
+			            const key = `${x},${y}`
+
+			            if (!snakePositions.has(key) && !wallPositions.has(key)) {
+			                validPositions.push({ x, y })
+			            }
 			        }
 			    }
-			    while (snake.value.some(segment => segment.x === food.x && segment.y === food.y))
 
-			    return food
-	        }
+			    if (validPositions.length === 0) return null
+
+			    const randomIndex = Math.floor(Math.random() * validPositions.length)
+
+			    return validPositions[randomIndex]
+			}
 
 	        function spawnBlueFood() {
-	        	let food = null
+			    const validPositions = []
+			    const snakePositions = new Set(snake.value.map(seg => `${seg.x},${seg.y}`))
+			    const wallPositions = new Set(wallBlocks.value.map(wall => `${wall.x},${wall.y}`))
+			    const redPos = redFood.value ? `${redFood.value.x},${redFood.value.y}` : null
 
-			    do {
-			        food = {
-			            x: Math.floor(Math.random() * (canvas.value.width / gridSize)) * gridSize,
-			            y: Math.floor(Math.random() * (canvas.value.height / gridSize)) * gridSize
+			    for (let x = 0; x < canvas.value.width; x += gridSize) {
+			        for (let y = 0; y < canvas.value.height; y += gridSize) {
+			            const key = `${x},${y}`
+
+			            if (!snakePositions.has(key) && key !== redPos && !wallPositions.has(key)) {
+			                validPositions.push({ x, y })
+			            }
 			        }
 			    }
-			    while (snake.value.some(segment => segment.x === food.x && segment.y === food.y) || (redFood.value && food.x === redFood.value.x && food.y === redFood.value.y))
 
-			    return food
-	        }
+			    if (validPositions.length === 0) return null
+
+			    const randomIndex = Math.floor(Math.random() * validPositions.length)
+
+			    return validPositions[randomIndex]
+			}
 
 	        const createAudioBuffer = async (audioUrl) => {
 			    const response = await fetch(audioUrl, { cache: 'force-cache' })
@@ -211,11 +303,20 @@
 	        const resetGame = () => {
 	        	clearTimeout(gameLoopTimeout)
 
-				scoreCounter.value = 0
-
-			  	score = 0
+				if (localStorage.getItem('CapacitorStorage.stageScore') !== null) {
+	        		scoreCounter.value = JSON.parse(decrypt(localStorage.getItem('CapacitorStorage.stageScore')))
+	        		
+	            	score = JSON.parse(decrypt(localStorage.getItem('CapacitorStorage.stageScore')))
+	            }
+	            else {
+	            	scoreCounter.value = 0
+	        		
+	            	score = 0
+	            }
 
 			  	speed = 200
+
+			  	speedIncreaser = 1
 
 			  	direction = "RIGHT"
 
@@ -226,6 +327,8 @@
 			  	redFood.value = spawnFood()
 
 			  	blueFood.value = null
+
+			  	redFoodEaten = 0
 
 			  	isGameOver.value = false
 
@@ -244,10 +347,55 @@
 	            head.x += moves[direction][0]
 	            head.y += moves[direction][1]
 
+	            if (snake.value.slice(1).some(segment => segment.x === head.x && segment.y === head.y) || wallBlocks.value.some((w) => w.x === head.x && w.y === head.y)) {
+	            	if (enableSounds.value) {
+	            		playSound(gameOverBuffer)
+	            	}
+
+	            	isGameOver.value = true
+
+	                nextStageFoodEaten = 0
+
+	                Swal.fire({
+						title: 'Game over',
+						html: `
+							<div class="swalText" style="display: block;">Do you want to restart or go back?</div>
+							<div class="swalButtonsContainer">
+						    	<button id="swalRestartButton" class="swalButtons swalRestartButton">Restart</button>
+						    	<button id="swalExitButton" class="swalButtons swalExitButton">Back</button>
+						    </div>
+						`,
+						showConfirmButton: false,
+  						showCancelButton: false,
+						allowEscapeKey: false,
+					    allowOutsideClick: false,
+					    backdrop: true,
+					    didOpen: () => {
+						    const restartButton = document.getElementById('swalRestartButton')
+
+						    restartButton.addEventListener('click', async() => {
+						       	await Swal.close()
+
+						        resetGame()
+						    })
+
+						    const exitButton = document.getElementById('swalExitButton')
+
+						    exitButton.addEventListener('click', async() => {
+						        await Swal.close()
+
+						        router.push({ name: 'Home' })
+						    })
+						}
+					})
+
+					return
+	            }
+
 	            head.x = (head.x + canvas.value.width) % canvas.value.width
 	            head.y = (head.y + canvas.value.height) % canvas.value.height
 
-	            if (head.x === redFood.value.x && head.y === redFood.value.y) {
+	            if (redFood.value && head.x === redFood.value.x && head.y === redFood.value.y) {
 	            	if (enableSounds.value) {
 	            		playSound(fruitEatBuffer)
 	            	}
@@ -259,6 +407,116 @@
 	                redFood.value = spawnFood()
 
 	                speed = Math.max(50, speed - speedIncreaser)
+
+	                nextStageFoodEaten++
+
+	                if (nextStageFoodEaten >= stageConfigs[currentStage.value].fruitsToNext) {
+	                	redFood.value = null
+
+	                	blueFood.value = null
+
+	                	clearTimeout(blueFoodTimer)
+
+	                	nextStageFoodEaten = 0
+
+	                	let currentStageToShow = currentStage.value
+
+	                	currentStage.value++
+
+			          	if (stageConfigs[currentStage.value]) {
+			          		if (enableSounds.value) {
+			            		playSound(missionCompletedBuffer)
+			            	}
+
+			          		isGameOver.value = true
+
+			            	Swal.fire({
+			            		title: 'Mission completed',
+								html: `
+									<div class="swalText" style="display: block;">You have completed mission: ` + currentStageToShow + `</div>
+									<div class="swalButtonsContainer">
+								    	<button id="swalNextStageButton" class="swalButtons swalNextMissionButton">Next mission</button>
+								    </div>
+								`,
+								showConfirmButton: false,
+		  						showCancelButton: false,
+								allowEscapeKey: false,
+							    allowOutsideClick: false,
+							    backdrop: true,
+							    didOpen: () => {
+								    const nextStageButton = document.getElementById('swalNextStageButton')
+
+								    nextStageButton.addEventListener('click', async() => {
+								       	await Swal.close()
+
+								       	isGameOver.value = false
+
+								       	await applyStage(currentStage.value)
+
+								       	gameLoop()
+								    })
+								}
+			            	})
+			          	}
+			          	else {
+			          		if (enableSounds.value) {
+			            		playSound(gameCompletedBuffer)
+			            	}
+
+			          		isGameOver.value = true
+
+	                		saveScore()
+
+	                		currentStage.value = 1
+
+	                		nextStageFoodEaten = 0
+
+			            	Swal.fire({
+								title: 'Congratulations',
+								html: `
+									<div class="swalText" style="display: block;">You have completed all missions.</div>
+									<div class="swalButtonsContainer">
+								    	<button id="swalRestartButton" class="swalButtons swalRestartButton">Replay</button>
+								    	<button id="swalExitButton" class="swalButtons swalExitButton">Back</button>
+								    </div>
+								`,
+								showConfirmButton: false,
+		  						showCancelButton: false,
+								allowEscapeKey: false,
+							    allowOutsideClick: false,
+							    backdrop: true,
+							    didOpen: () => {
+								    const restartButton = document.getElementById('swalRestartButton')
+
+								    restartButton.addEventListener('click', async() => {
+								       	await Swal.close()
+
+								       	await applyStage(currentStage.value)
+
+								       	await Preferences.remove({ key: 'currentStage' })
+
+								        await Preferences.remove({ key: 'stageScore' })
+
+								        resetGame()
+								    })
+
+								    const exitButton = document.getElementById('swalExitButton')
+
+								    exitButton.addEventListener('click', async() => {
+								        await Swal.close()
+
+								        await Preferences.remove({ key: 'currentStage' })
+
+								        await Preferences.remove({ key: 'stageScore' })
+
+								        router.push({ name: 'Home' })
+								    })
+								}
+							})
+
+			            	return
+			          	}
+			        }
 
 	                if (redFoodEaten >= nextBlueFoodAt) {
 	                    redFoodEaten = 0
@@ -293,49 +551,6 @@
 	            }
 
 	            snake.value.unshift(head)
-
-	            if (snake.value.slice(1).some(segment => segment.x === head.x && segment.y === head.y)) {
-	            	if (enableSounds.value) {
-	            		playSound(gameOverBuffer)
-	            	}
-
-	            	isGameOver.value = true
-
-	                saveScore()
-
-	                Swal.fire({
-						title: 'Game over',
-						html: `
-							<div class="swalText" style="display: block;">Do you want to restart or go back?</div>
-							<div class="swalButtonsContainer">
-						    	<button id="swalRestartButton" class="swalButtons swalRestartButton">Restart</button>
-						    	<button id="swalExitButton" class="swalButtons swalExitButton">Back</button>
-						    </div>
-						`,
-						showConfirmButton: false,
-  						showCancelButton: false,
-						allowEscapeKey: false,
-					    allowOutsideClick: false,
-					    backdrop: true,
-					    didOpen: () => {
-						    const restartButton = document.getElementById('swalRestartButton')
-
-						    restartButton.addEventListener('click', async() => {
-						       	await Swal.close()
-
-						        resetGame()
-						    })
-
-						    const exitButton = document.getElementById('swalExitButton')
-
-						    exitButton.addEventListener('click', async() => {
-						        await Swal.close()
-
-						        router.push({ name: 'Home' })
-						    })
-						}
-					})
-	            }
 
 	            scoreCounter.value = score
 	        }
@@ -382,13 +597,15 @@
 
 			    ctx.fillRect(0, 0, canvas.value.width, canvas.value.height)
 
-			    ctx.fillStyle = "red"
+			    if (redFood.value) {
+			    	ctx.fillStyle = "red"
 
-			    ctx.beginPath()
+				    ctx.beginPath()
 
-			    ctx.arc(redFood.value.x + gridSize / 2, redFood.value.y + gridSize / 2, gridSize / 2, 0, Math.PI * 2)
+				    ctx.arc(redFood.value.x + gridSize / 2, redFood.value.y + gridSize / 2, gridSize / 2, 0, Math.PI * 2)
 
-			    ctx.fill()
+				    ctx.fill()
+			    }
 
 			    if (blueFood.value) {
 			        ctx.fillStyle = "blue"
@@ -399,6 +616,12 @@
 
 			        ctx.fill()
 			    }
+
+			    ctx.fillStyle = 'yellow'
+
+			    wallBlocks.value.forEach((block) => {
+			        ctx.fillRect(block.x, block.y, gridSize, gridSize)
+			    })
 
 			    ctx.fillStyle = "lime"
 
@@ -423,6 +646,8 @@
 	            }
 
 	            if (keyDirectionMap[event.key]) {
+	            	event.preventDefault()
+
 	                setDirection(keyDirectionMap[event.key])
 	            }
 	        }
@@ -433,30 +658,50 @@
 	        }
 
 	        const handleTouchEnd = (event) => {
-	            const touchEndX = event.changedTouches[0].clientX
-	            const touchEndY = event.changedTouches[0].clientY
+				const touchEndX = event.changedTouches[0].clientX
+				const touchEndY = event.changedTouches[0].clientY
 
-	            const diffX = touchEndX - touchStartX
-	            const diffY = touchEndY - touchStartY
+				const diffX = touchEndX - touchStartX
+				const diffY = touchEndY - touchStartY
 
-	            if (Math.abs(diffX) > Math.abs(diffY)) {
-	                setDirection(diffX > 0 ? "RIGHT" : "LEFT")
-	            }
-	            else {
-	                setDirection(diffY > 0 ? "DOWN" : "UP")
-	            }
-	        }
+				if (Math.abs(diffX) > Math.abs(diffY)) {
+					if (Math.abs(diffX) > swipeThreshold) {
+						setDirection(diffX > 0 ? "RIGHT" : "LEFT")
+					}
+				}
+				else {
+					if (Math.abs(diffY) > swipeThreshold) {
+						setDirection(diffY > 0 ? "DOWN" : "UP")
+					}
+				}
+			}
 
 	        onMounted(async() => {
+	        	if (localStorage.getItem('CapacitorStorage.stageScore') !== null) {
+	        		scoreCounter.value = JSON.parse(decrypt(localStorage.getItem('CapacitorStorage.stageScore')))
+	        		
+	            	score = JSON.parse(decrypt(localStorage.getItem('CapacitorStorage.stageScore')))
+	            }
+
+	            if (localStorage.getItem('CapacitorStorage.currentStage') !== null) {
+	            	currentStage.value = JSON.parse(decrypt(localStorage.getItem('CapacitorStorage.currentStage')))
+	            }
+
 	        	if (localStorage.getItem('CapacitorStorage.enableButtons') !== null) {
 		            enableButtons.value = JSON.parse(decrypt(localStorage.getItem('CapacitorStorage.enableButtons')))
 	            }
+
+	            await applyStage(currentStage.value)
 
 	        	redFood.value = spawnFood()
 
 	            blueFood.value = null
 
 	            gameLoop()
+
+	            canvas.value.addEventListener('touchmove', (e) => {
+			        e.preventDefault()
+			    }, { passive: false })
 
 	            if (localStorage.getItem('CapacitorStorage.enableSounds') !== null) {
 	            	enableSounds.value = JSON.parse(decrypt(localStorage.getItem('CapacitorStorage.enableSounds')))
@@ -470,10 +715,18 @@
 	    			superFruitEatBuffer = await createAudioBuffer('/audios/superFruitEat.mp3')
 
 	    			gameOverBuffer = await createAudioBuffer('/audios/gameOver.mp3')
+
+	    			missionCompletedBuffer = await createAudioBuffer('/audios/missionCompleted.mp3')
+
+	    			gameCompletedBuffer = await createAudioBuffer('/audios/gameCompleted.mp3')
 	            }
 	        })
 
 	        onBeforeUnmount(() => {
+	        	canvas.value.removeEventListener('touchmove', (e) => {
+			        e.preventDefault()
+			    })
+
 	            window.removeEventListener("keydown", handleKeydown)
 
 	            canvas.value.removeEventListener("touchstart", handleTouchStart)
@@ -483,6 +736,7 @@
 	        return {
 	            canvas,
 	            scoreCounter,
+	            currentStage,
 	            setDirection,
 	            enableButtons,
 	            isGameStarted,
@@ -501,9 +755,15 @@
 	    margin-top: 10px;
 	}
 
+	.fullWidthScoreContainer {
+		display: flex;
+		justify-content: center;
+	}
+
 	.scoreContainer {
+		width: 268px;
 	    display: flex;
-	    justify-content: center;
+	    justify-content: space-between;
 	    margin-bottom: 10px;
 	}
 
