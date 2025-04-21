@@ -85,7 +85,7 @@
 
 <style scoped>
 	.mainContainer {
-	    min-height: calc(var(--vh) * 100 - 174.4px);
+	    min-height: calc(100vh - 174.4px);
 	    margin-top: 30px;
 	}
 

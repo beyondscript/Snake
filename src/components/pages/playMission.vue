@@ -335,6 +335,14 @@
 			  	gameLoop()
 			}
 
+			const popStateHandler = async() => {
+				await Swal.close()
+
+				history.back()
+
+				window.removeEventListener('popstate', popStateHandler)
+		    }
+
 	        const update = () => {
 	        	if (directionQueue.length > 0) {
 			        direction = directionQueue.shift()
@@ -356,6 +364,10 @@
 
 	                nextStageFoodEaten = 0
 
+	                history.pushState({ ...history.state }, '', location.href)
+
+					window.addEventListener('popstate', popStateHandler)
+
 	                Swal.fire({
 						title: 'Game over',
 						html: `
@@ -376,6 +388,8 @@
 						    restartButton.addEventListener('click', async() => {
 						       	await Swal.close()
 
+						       	window.removeEventListener('popstate', popStateHandler)
+
 						        resetGame()
 						    })
 
@@ -383,6 +397,8 @@
 
 						    exitButton.addEventListener('click', async() => {
 						        await Swal.close()
+
+						        window.removeEventListener('popstate', popStateHandler)
 
 						        router.push({ name: 'Home' })
 						    })
@@ -430,6 +446,10 @@
 
 			          		isGameOver.value = true
 
+			          		history.pushState({ ...history.state }, '', location.href)
+
+							window.addEventListener('popstate', popStateHandler)
+
 			            	Swal.fire({
 			            		title: 'Mission completed',
 								html: `
@@ -448,6 +468,8 @@
 
 								    nextStageButton.addEventListener('click', async() => {
 								       	await Swal.close()
+
+								       	window.removeEventListener('popstate', popStateHandler)
 
 								       	isGameOver.value = false
 
@@ -471,6 +493,10 @@
 
 	                		nextStageFoodEaten = 0
 
+	                		history.pushState({ ...history.state }, '', location.href)
+
+							window.addEventListener('popstate', popStateHandler)
+
 			            	Swal.fire({
 								title: 'Congratulations',
 								html: `
@@ -491,6 +517,8 @@
 								    restartButton.addEventListener('click', async() => {
 								       	await Swal.close()
 
+								       	window.removeEventListener('popstate', popStateHandler)
+
 								       	await applyStage(currentStage.value)
 
 								       	await Preferences.remove({ key: 'currentStage' })
@@ -504,6 +532,8 @@
 
 								    exitButton.addEventListener('click', async() => {
 								        await Swal.close()
+
+								        window.removeEventListener('popstate', popStateHandler)
 
 								        await Preferences.remove({ key: 'currentStage' })
 
@@ -751,7 +781,7 @@
 
 <style scoped>
 	.mainContainer {
-	    min-height: calc(var(--vh) * 100 - 154.4px);
+	    min-height: calc(100vh - 154.4px);
 	    margin-top: 10px;
 	}
 

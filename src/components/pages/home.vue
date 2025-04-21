@@ -16,7 +16,19 @@
 		setup() {
 			const router = useRouter()
 
+			const popStateHandler = async() => {
+				await Swal.close()
+
+				history.back()
+
+				window.removeEventListener('popstate', popStateHandler)
+		    }
+
 			const selectMode = () => {
+				history.pushState({ ...history.state }, '', location.href)
+
+				window.addEventListener('popstate', popStateHandler)
+
 				Swal.fire({
 					title: 'Select mode',
 					html: `
@@ -37,6 +49,8 @@
 						classicButton.addEventListener('click', async() => {
 						    await Swal.close()
 
+							window.removeEventListener('popstate', popStateHandler)
+
 						    router.push({ name: 'Play Classic' })
 						})
 
@@ -44,6 +58,8 @@
 
 						missionButton.addEventListener('click', async() => {
 						    await Swal.close()
+
+							window.removeEventListener('popstate', popStateHandler)
 
 						    router.push({ name: 'Play Mission' })
 						})
@@ -60,7 +76,7 @@
 
 <style scoped>
 	.mainContainer {
-	    min-height: calc(var(--vh) * 100 - 159.4px);
+	    min-height: calc(100vh - 159.4px);
 	    margin-top: 15px;
 	}
 

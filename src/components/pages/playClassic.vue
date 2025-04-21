@@ -250,6 +250,14 @@
 			  	gameLoop()
 			}
 
+			const popStateHandler = async() => {
+				await Swal.close()
+
+				history.back()
+
+				window.removeEventListener('popstate', popStateHandler)
+		    }
+
 	        const update = () => {
 	        	if (directionQueue.length > 0) {
 			        direction = directionQueue.shift()
@@ -271,6 +279,10 @@
 
 	                saveScore()
 
+	                history.pushState({ ...history.state }, '', location.href)
+
+					window.addEventListener('popstate', popStateHandler)
+
 	                Swal.fire({
 						title: 'Game over',
 						html: `
@@ -291,6 +303,8 @@
 						    restartButton.addEventListener('click', async() => {
 						       	await Swal.close()
 
+						       	window.removeEventListener('popstate', popStateHandler)
+
 						        resetGame()
 						    })
 
@@ -298,6 +312,8 @@
 
 						    exitButton.addEventListener('click', async() => {
 						        await Swal.close()
+
+						        window.removeEventListener('popstate', popStateHandler)
 
 						        router.push({ name: 'Home' })
 						    })
@@ -531,7 +547,7 @@
 
 <style scoped>
 	.mainContainer {
-	    min-height: calc(var(--vh) * 100 - 154.4px);
+	    min-height: calc(100vh - 154.4px);
 	    margin-top: 10px;
 	}
 
